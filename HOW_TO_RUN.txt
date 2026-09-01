@@ -1,0 +1,352 @@
+NEOLIT PROJECT - HOW TO RUN AFTER DOWNLOADING
+===============================================
+
+This guide explains how to run the NeoLit literacy learning platform on Windows.
+
+PROJECT FOLDERS
+---------------
+
+Backend  = FastAPI Python API and database code
+frontend = React and Vite web application
+
+The application uses:
+
+- Frontend: React, Vite, Tailwind CSS, React Router, Axios
+- Backend: Python, FastAPI, SQLAlchemy, Pydantic, JWT
+- Database: MySQL
+
+1. REQUIREMENTS
+---------------
+
+Install these programs before running the project:
+
+- Python 3.11 or newer
+- Node.js 18 or newer
+- npm, included with Node.js
+- MySQL 8 or newer
+
+Check that Python and Node.js are installed:
+
+    python --version
+    node --version
+    npm --version
+
+If the command "python" is not available on Windows, install Python from python.org and enable "Add Python to PATH" during installation.
+
+2. OPEN THE PROJECT
+-------------------
+
+Open PowerShell in the downloaded project folder:
+
+    cd "C:\Users\DELL\Desktop\Duoling website"
+
+Your folder should contain:
+
+    Backend
+    frontend
+
+3. SET UP THE BACKEND
+---------------------
+
+Go to the backend folder:
+
+    cd Backend
+
+Create a Python virtual environment if one does not already exist:
+
+    python -m venv .venv
+
+Activate the virtual environment:
+
+    .\.venv\Scripts\Activate.ps1
+
+If PowerShell blocks activation, run PowerShell as your normal user and use this command once:
+
+    Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+Then activate again:
+
+    .\.venv\Scripts\Activate.ps1
+
+Install all backend packages:
+
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+
+The requirements file installs:
+
+- fastapi: backend web framework
+- uvicorn: development web server
+- sqlalchemy: database ORM
+- SQLite: included with Python for automatic local database creation
+- pydantic and pydantic-settings: validation and environment settings
+- python-jose: JWT token support
+- passlib and bcrypt 4.0.1: secure password hashing
+- python-dotenv: .env file support
+- alembic: database migration support
+- pytest and httpx: backend testing
+
+4. BACKEND ENVIRONMENT FILE
+---------------------------
+
+The backend uses SQLite and creates the database automatically. Copy `Backend/.env.example` to `Backend/.env`:
+
+    DATABASE_URL=sqlite:///./neolit.db
+    SECRET_KEY=local-development-secret-change-before-deploying
+    ALGORITHM=HS256
+    ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+Do not commit a real `.env` file containing production secrets.
+
+5. SQLITE DATABASE AND ADMIN USER LIST
+--------------------------------------
+
+The application automatically creates `neolit.db` and these tables on first startup:
+
+The application creates these tables on first startup:
+
+    users, learner_profiles, languages, levels, modules, lessons, activities,
+    contents, content_translations, assessments, questions, question_options,
+    assessment_attempts, assessment_answers, learner_progress
+
+Register the administrator account normally, then promote it explicitly in SQLite:
+
+    sqlite3 neolit.db "UPDATE users SET is_admin = 1 WHERE email = 'admin@example.com';"
+
+Log in with that account and call:
+
+    GET http://localhost:8000/api/auth/users
+
+with its bearer token. The endpoint returns only safe user information.
+
+6. START THE BACKEND
+--------------------
+
+Run this command from the Backend folder while the virtual environment is active:
+
+    python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+The backend will be available at:
+
+    http://localhost:8000
+
+Check that it works by opening:
+
+    http://localhost:8000/health
+
+Expected response:
+
+    {"status":"ok"}
+
+FastAPI API documentation is available at:
+
+    http://localhost:8000/docs
+
+Keep this terminal open while using the application.
+
+7. SET UP THE FRONTEND
+----------------------
+
+Open a second PowerShell terminal in the project folder and run:
+
+    cd "C:\Users\DELL\Desktop\Duoling website\frontend"
+    npm install
+
+This installs the packages listed in frontend/package.json:
+
+- react and react-dom
+- react-router-dom
+- axios
+- vite
+- Tailwind CSS
+- PostCSS and Autoprefixer
+- Vite React plugin
+
+8. START THE FRONTEND
+----------------------
+
+Run this command from the frontend folder:
+
+    npm run dev
+
+The frontend will be available at:
+
+    http://localhost:5173
+
+Keep the frontend terminal open too.
+
+8. USE THE APPLICATION
+----------------------
+
+Open this URL in your browser:
+
+    http://localhost:5173
+
+Then follow this flow:
+
+1. Open Register.
+2. Enter first name, last name, email, and a password of at least 8 characters.
+3. Create the account.
+4. Log in with the same email and password.
+5. Review or update your learning profile.
+6. Choose a learning language and current level.
+7. Browse curriculum modules and lessons.
+8. Open an assessment.
+9. Submit answers.
+10. Review the score and proficiency benchmark.
+11. Continue to the next harder assessment.
+12. Check the updated progress cards on the dashboard.
+
+The initial seed data includes English, Hindi, Telugu, five proficiency levels, curriculum modules, lessons, activities, and reading, writing, and comprehension assessments.
+
+9. FRONTEND PRODUCTION BUILD
+----------------------------
+
+To test the production build:
+
+    cd frontend
+    npm run build
+
+If the build succeeds, the compiled files are created in frontend/dist.
+
+10. BACKEND TESTS
+-----------------
+
+Open another terminal, activate the backend environment, and run:
+
+    cd Backend
+    .\.venv\Scripts\Activate.ps1
+    python -m pytest -q
+
+The tests check the registration, login, JWT, and current-user flow.
+
+11. COMMON PROBLEMS
+-------------------
+
+Problem: "python is not recognized"
+
+Solution: Install Python and enable "Add Python to PATH". Restart VS Code or PowerShell afterward.
+
+Problem: "npm is not recognized"
+
+Solution: Install Node.js, then restart VS Code or PowerShell.
+
+Problem: Login says "Invalid email or password"
+
+Solution: Confirm that registration completed successfully and that you are using the exact same email and password. Passwords are case-sensitive.
+
+Problem: Registration returns a server error while hashing the password
+
+Solution: Install the backend requirements again. This project pins bcrypt to version 4.0.1 for Passlib compatibility:
+
+    python -m pip install -r requirements.txt
+
+Problem: The dashboard says it cannot load the learning space
+
+Solution: Confirm that the backend is running at http://localhost:8000 before opening the frontend. Also check http://localhost:8000/health.
+
+Problem: Port 8000 is already in use
+
+Solution: Stop the other backend process or use another port:
+
+    python -m uvicorn app.main:app --reload --port 8001
+
+Then set the frontend API URL before starting Vite:
+
+    $env:VITE_API_BASE_URL="http://localhost:8001"
+    npm run dev
+
+Problem: Port 5173 is already in use
+
+Solution: Vite will normally choose another available port and print the new URL in the terminal.
+
+12. IMPORTANT FILES
+-------------------
+
+Backend/app/main.py       FastAPI application and routes
+Backend/app/config.py     Environment configuration
+Backend/app/database.py   SQLAlchemy database connection
+Backend/app/models/       Database models
+Backend/app/schemas/      API validation schemas
+Backend/app/routers/      Authentication and learning APIs
+Backend/app/seed.py       Initial languages, levels, lessons, and assessments
+Backend/requirements.txt   Python package list
+Backend/.env              Local environment settings
+
+frontend/src/App.jsx                  React routes
+frontend/src/context/AuthContext.jsx  Login state and JWT handling
+frontend/src/pages/                   Login, register, profile, and dashboard pages
+frontend/src/services/                Axios API clients
+frontend/package.json                 Frontend package list
+
+13. IMPORTANT API URLS
+----------------------
+
+GET  /health
+POST /api/auth/register
+POST /api/auth/login
+GET  /api/auth/me
+GET  /api/languages
+GET  /api/levels
+GET  /api/curriculum
+GET  /api/modules/{module_id}
+GET  /api/lessons/{lesson_id}
+GET  /api/content
+GET  /api/assessments
+GET  /api/assessments/{assessment_id}
+POST /api/assessments/{assessment_id}/submit
+GET  /api/users/me
+PUT  /api/users/me
+GET  /api/progress/me
+
+Interactive API documentation:
+
+    http://localhost:8000/docs
+
+14. WHAT TO BUILD NEXT
+----------------------
+
+The Weeks 1-2 foundation is complete. Recommended next work:
+
+- Add completed lesson tracking.
+- Add assessment history API pagination.
+- Add lesson detail pages.
+- Add weak-skill calculations.
+- Add learner preferences.
+- Add personalized lesson recommendations in Weeks 3-4.
+- Add AI evaluation only after the foundation is stable.
+
+Do not move authentication, score calculation, or proficiency benchmark logic into React. Those responsibilities belong in the FastAPI backend.
+
+
+
+
+
+
+
+
+
+
+@router.post("/login", response_model=dict)
+def login_user(payload: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token(user.id)
+    return {
+        "message": "Login successful",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": UserResponse.model_validate(user),
+    }
+
+
+@router.post("/logout")
+def logout_user():
+    return {"message": "Logged out successfully"}
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
