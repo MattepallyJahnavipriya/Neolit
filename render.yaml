@@ -19,6 +19,6 @@ services:
       - key: CORS_ORIGINS
         value: https://neolit-eight.vercel.app,https://neolit-literacy-platform.vercel.app,https://neolit-literacy-platform-niylk93x0.vercel.app
       - key: CORS_ORIGIN_REGEX
-        value: ^https://neolit-literacy-platform(?:-[a-z0-9-]+)*\.vercel\.app$
+        value: ^https://neolit(?:-[a-z0-9-]+)*\.vercel\.app$
       - key: ADMIN_SETUP_KEY
         sync: false

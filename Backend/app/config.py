@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     )
     CORS_ORIGIN_REGEX: str = os.getenv(
         "CORS_ORIGIN_REGEX",
-        r"^https://neolit-literacy-platform(?:-[a-z0-9-]+)*\.vercel\.app$",
+        r"^https://neolit(?:-[a-z0-9-]+)*\.vercel\.app$",
     )
     ADMIN_SETUP_KEY: str = os.getenv("ADMIN_SETUP_KEY", "")
 
