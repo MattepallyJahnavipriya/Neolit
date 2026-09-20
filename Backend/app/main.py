@@ -21,6 +21,7 @@ def prepare_database():
 
 configured_origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",") if origin.strip()]
 required_frontend_origins = [
+    "https://neolit-eight.vercel.app",
     "https://neolit-literacy-platform.vercel.app",
     "https://neolit-literacy-platform-niylk93x0.vercel.app",
     "http://localhost:5173",
