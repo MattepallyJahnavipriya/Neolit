@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
     import.meta.env.PROD
-        ? 'https://neolit-literacy-platform-1.onrender.com'
+        ? 'https://neolit.onrender.com'
         : 'http://localhost:8000'
 )
 
