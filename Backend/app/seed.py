@@ -3,22 +3,77 @@ from sqlalchemy.orm import Session
 from app.models.learning import Activity, Assessment, Content, Language, Lesson, Level, Module, Question, QuestionOption
 
 
-LANGUAGE_DATA = [
+LANGUAGES = [
     ("English", "en"),
     ("Hindi", "hi"),
-    ("Telugu", "te"),
-    ("Tamil", "ta"),
     ("Kannada", "kn"),
+    ("Tamil", "ta"),
+    ("Telugu", "te"),
 ]
 
 
 def ensure_languages(db: Session) -> list[Language]:
+    supported_codes = {code for _, code in LANGUAGES}
     existing_codes = {language.code for language in db.query(Language).all()}
-    missing = [Language(name=name, code=code) for name, code in LANGUAGE_DATA if code not in existing_codes]
-    if missing:
-        db.add_all(missing)
+    missing_languages = [Language(name=name, code=code) for name, code in LANGUAGES if code not in existing_codes]
+    if missing_languages:
+        db.add_all(missing_languages)
         db.flush()
-    return db.query(Language).order_by(Language.id).all()
+    for language in db.query(Language).all():
+        language.is_active = language.code in supported_codes
+    return db.query(Language).filter(Language.code.in_(supported_codes)).order_by(Language.id).all()
+
+
+def ensure_language_courses(db: Session, languages: list[Language]) -> None:
+    language_by_name = {language.name.lower(): language for language in languages}
+    for module in db.query(Module).all():
+        for language_name, language in language_by_name.items():
+            if module.title.lower().startswith(f"{language_name} ") and module.language_id != language.id:
+                module.language_id = language.id
+                break
+
+    levels = db.query(Level).order_by(Level.minimum_score).all()
+    if not levels:
+        return
+
+    beginner = levels[0]
+    for language in languages:
+        existing_modules = db.query(Module).filter(
+            Module.language_id == language.id,
+            Module.level_id == beginner.id,
+        ).count()
+        if existing_modules:
+            continue
+
+        for module_number in range(1, 3):
+            module = Module(
+                language=language,
+                level=beginner,
+                title=f"{language.name} Foundations {module_number}",
+                description="Practical language for daily reading and conversation.",
+                order_number=module_number,
+            )
+            for lesson_number in range(1, 4):
+                lesson = Lesson(
+                    module=module,
+                    title=f"Lesson {lesson_number}: Everyday communication",
+                    description="Read, notice, and use useful phrases.",
+                    order_number=lesson_number,
+                    lesson_type="mixed",
+                )
+                lesson.activities = [
+                    Activity(title="Read the phrase", activity_type="reading", content="Read the example aloud twice.", order_number=1),
+                    Activity(title="Notice the words", activity_type="vocabulary", content="Underline one new word and explain it.", order_number=2),
+                    Activity(title="Write your answer", activity_type="writing", content="Write one sentence about your day.", order_number=3),
+                ]
+                lesson.contents = [Content(
+                    title="A useful greeting",
+                    content_type="lesson",
+                    content={"en": "Hello, how are you?", "hi": "आप कैसे हैं?", "te": "మీరు ఎలా ఉన్నారు?"}.get(language.code, "Hello, how are you?"),
+                    language=language,
+                )]
+                module.lessons.append(lesson)
+            db.add(module)
 
 
 def add_extra_questions(db: Session) -> None:
@@ -62,18 +117,74 @@ def add_extra_questions(db: Session) -> None:
                 correct_answer=answer,
                 options=[QuestionOption(option_text=choice, is_correct=choice == answer) for choice in choices],
             ))
+        question_number = len(assessment.questions)
+        while question_number < 10:
+            question_number += 1
+            if question_number in (7, 8):
+                question_type = "speech"
+                question_text = f"Say this sentence aloud: Hello, how are you? (Speaking {question_number - 6})"
+                answer = "Hello, how are you?"
+                choices = []
+            elif question_number in (6, 10):
+                question_type = "long_text"
+                question_text = f"Write one sentence about your daily language practice ({question_number})."
+                answer = ""
+                choices = []
+            else:
+                question_type = "multiple_choice"
+                question_text = f"Which answer is useful in everyday conversation? ({question_number})"
+                answer = "Hello"
+                choices = ["Hello", "Table", "Window"]
+            if question_text not in existing_questions:
+                assessment.questions.append(Question(
+                    question_text=question_text,
+                    question_type=question_type,
+                    marks=1,
+                    correct_answer=answer,
+                    options=[QuestionOption(option_text=choice, is_correct=choice == answer) for choice in choices],
+                ))
+                existing_questions.add(question_text)
+
         assessment.total_marks = sum(question.marks for question in assessment.questions)
         assessment.passing_marks = max(1, (assessment.total_marks + 1) // 2)
 
+    english = db.query(Language).filter(Language.code == "en").first()
+    if english:
+        english_assessments = db.query(Assessment).filter(Assessment.language_id == english.id).all()
+        for language in db.query(Language).filter(Language.id != english.id).all():
+            existing_titles = {item.title for item in db.query(Assessment).filter(Assessment.language_id == language.id).all()}
+            for source in english_assessments:
+                if source.title in existing_titles:
+                    continue
+                clone = Assessment(
+                    title=source.title,
+                    description=source.description,
+                    assessment_type=source.assessment_type,
+                    language=language,
+                    level_id=source.level_id,
+                    total_marks=source.total_marks,
+                    passing_marks=source.passing_marks,
+                )
+                clone.questions = [Question(
+                    question_text=question.question_text,
+                    question_type=question.question_type,
+                    marks=question.marks,
+                    correct_answer=question.correct_answer,
+                    options=[QuestionOption(option_text=option.option_text, is_correct=option.is_correct) for option in question.options],
+                ) for question in source.questions]
+                db.add(clone)
+
 
 def seed_learning_content(db: Session) -> None:
-    has_languages = db.query(Language).first() is not None
-    languages = ensure_languages(db) if has_languages else []
-    if has_languages and db.query(Assessment).count() >= 6:
+    if db.query(Language).first() and db.query(Assessment).count() >= 6:
+        languages = ensure_languages(db)
+        ensure_language_courses(db, languages)
         add_extra_questions(db)
         db.commit()
         return
-    if has_languages:
+    if db.query(Language).first():
+        languages = ensure_languages(db)
+        ensure_language_courses(db, languages)
         levels = db.query(Level).order_by(Level.minimum_score).all()
         advanced_level = levels[2]
         existing_types = {item.assessment_type for item in db.query(Assessment).filter(Assessment.level_id == advanced_level.id).all()}
@@ -89,7 +200,7 @@ def seed_learning_content(db: Session) -> None:
                 db.add(assessment)
         db.commit()
         return
-    languages = [Language(name=name, code=code) for name, code in LANGUAGE_DATA]
+    languages = [Language(name=name, code=code) for name, code in LANGUAGES]
     levels = [
         Level(name="Beginner", description="Build confidence with everyday words and sentences.", minimum_score=0, maximum_score=39),
         Level(name="Elementary", description="Understand familiar topics and short texts.", minimum_score=40, maximum_score=59),
@@ -110,8 +221,7 @@ def seed_learning_content(db: Session) -> None:
                     Activity(title="Notice the words", activity_type="vocabulary", content="Underline one new word and explain it.", order_number=2),
                     Activity(title="Write your answer", activity_type="writing", content="Write one sentence about your day.", order_number=3),
                 ]
-                greeting = {"en": "Hello, how are you?", "hi": "आप कैसे हैं?", "te": "మీరు ఎలా ఉన్నారు?"}.get(language.code, "Hello, how are you?")
-                lesson.contents = [Content(title="A useful greeting", content_type="lesson", content=greeting, language=language)]
+                lesson.contents = [Content(title="A useful greeting", content_type="lesson", content={"en": "Hello, how are you?", "hi": "आप कैसे हैं?", "te": "మీరు ఎలా ఉన్నారు?"}.get(language.code, "Hello, how are you?"), language=language)]
                 module.lessons.append(lesson)
             db.add(module)
     reading = Assessment(title="Reading: A Morning Routine", description="Read the passage and answer each question.", assessment_type="reading", language=languages[0], level=beginner, total_marks=2, passing_marks=1)

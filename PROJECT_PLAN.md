@@ -41,7 +41,9 @@ The Weeks 1-2 foundation provides:
 
 ### Database
 
-- SQLite is used for local development and is created automatically from `Backend/.env`.
+- MySQL is the intended production database.
+- Local development currently uses SQLite through `Backend/.env` so the project can run without a MySQL server.
+- Set `DATABASE_URL` to a MySQL connection string for deployment.
 
 ## 3. Repository Structure
 

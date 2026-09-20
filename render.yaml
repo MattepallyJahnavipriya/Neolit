@@ -4,13 +4,21 @@ services:
     env: python
     rootDir: Backend
     buildCommand: python -m pip install --upgrade pip && pip install -r requirements.txt
+    preDeployCommand: if [ "$RESET_DATABASE_ON_DEPLOY" = "YES" ]; then RESET_DATABASE=YES python reset_database.py; fi; alembic upgrade head && python -c "from app.database import SessionLocal; from app.seed import seed_learning_content; db = SessionLocal(); seed_learning_content(db); db.close()"
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        value: sqlite:///./neolit.db
+        sync: false
       - key: SECRET_KEY
         sync: false
       - key: ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
         value: "60"
+      - key: CORS_ORIGINS
+        value: https://neolit-literacy-platform.vercel.app,https://neolit-literacy-platform-niylk93x0.vercel.app
+      - key: CORS_ORIGIN_REGEX
+        value: ^https://neolit-literacy-platform(?:-[a-z0-9-]+)*\.vercel\.app$
+      - key: ADMIN_SETUP_KEY
+        sync: false

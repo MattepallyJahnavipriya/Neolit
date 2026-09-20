@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database import Base
@@ -11,11 +11,11 @@ class LearnerProfile(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     age = Column(Integer, nullable=True)
-    gender = Column(String(40), default="", nullable=False)
     native_language = Column(String(80), default="", nullable=False)
     learning_language = Column(String(20), default="en", nullable=False)
     education_level = Column(String(80), default="", nullable=False)
-    current_level_id = Column(Integer, ForeignKey("levels.id"), nullable=True, index=True)
+    gender = Column(String(40), default="", nullable=False)
+    current_level_id = Column(Integer, ForeignKey("levels.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user = relationship("User", back_populates="profile")
     current_level = relationship("Level")
@@ -44,11 +44,12 @@ class Level(Base):
 class Module(Base):
     __tablename__ = "modules"
     id = Column(Integer, primary_key=True)
-    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False, index=True)
-    level_id = Column(Integer, ForeignKey("levels.id"), nullable=False, index=True)
+    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False)
+    level_id = Column(Integer, ForeignKey("levels.id"), nullable=False)
     title = Column(String(150), nullable=False)
     description = Column(Text, default="", nullable=False)
     order_number = Column(Integer, default=1, nullable=False)
+    __table_args__ = (Index("ix_modules_language_level_order", "language_id", "level_id", "order_number"),)
     language = relationship("Language", back_populates="modules")
     level = relationship("Level", back_populates="modules")
     lessons = relationship("Lesson", back_populates="module", cascade="all, delete-orphan")
@@ -57,11 +58,12 @@ class Module(Base):
 class Lesson(Base):
     __tablename__ = "lessons"
     id = Column(Integer, primary_key=True)
-    module_id = Column(Integer, ForeignKey("modules.id"), nullable=False, index=True)
+    module_id = Column(Integer, ForeignKey("modules.id"), nullable=False)
     title = Column(String(150), nullable=False)
     description = Column(Text, default="", nullable=False)
     order_number = Column(Integer, default=1, nullable=False)
     lesson_type = Column(String(40), default="mixed", nullable=False)
+    __table_args__ = (Index("ix_lessons_module_order", "module_id", "order_number"),)
     module = relationship("Module", back_populates="lessons")
     activities = relationship("Activity", back_populates="lesson", cascade="all, delete-orphan")
     contents = relationship("Content", back_populates="lesson", cascade="all, delete-orphan")
@@ -70,24 +72,26 @@ class Lesson(Base):
 class Activity(Base):
     __tablename__ = "activities"
     id = Column(Integer, primary_key=True)
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
     title = Column(String(150), nullable=False)
     activity_type = Column(String(40), nullable=False)
     content = Column(Text, nullable=False)
     order_number = Column(Integer, default=1, nullable=False)
+    __table_args__ = (Index("ix_activities_lesson", "lesson_id"),)
     lesson = relationship("Lesson", back_populates="activities")
 
 
 class Content(Base):
     __tablename__ = "contents"
     id = Column(Integer, primary_key=True)
-    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False, index=True)
-    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False, index=True)
+    lesson_id = Column(Integer, ForeignKey("lessons.id"), nullable=False)
+    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False)
     title = Column(String(150), nullable=False)
     content_type = Column(String(40), nullable=False)
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (Index("ix_contents_lesson_language", "lesson_id", "language_id"),)
     lesson = relationship("Lesson", back_populates="contents")
     language = relationship("Language", back_populates="contents")
     translations = relationship("ContentTranslation", back_populates="content", cascade="all, delete-orphan")
@@ -96,8 +100,8 @@ class Content(Base):
 class ContentTranslation(Base):
     __tablename__ = "content_translations"
     id = Column(Integer, primary_key=True)
-    content_id = Column(Integer, ForeignKey("contents.id"), nullable=False, index=True)
-    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False, index=True)
+    content_id = Column(Integer, ForeignKey("contents.id"), nullable=False)
+    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False)
     translated_text = Column(Text, nullable=False)
     content = relationship("Content", back_populates="translations")
     language = relationship("Language")
@@ -109,10 +113,11 @@ class Assessment(Base):
     title = Column(String(150), nullable=False)
     description = Column(Text, default="", nullable=False)
     assessment_type = Column(String(30), nullable=False, index=True)
-    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False, index=True)
-    level_id = Column(Integer, ForeignKey("levels.id"), nullable=False, index=True)
+    language_id = Column(Integer, ForeignKey("languages.id"), nullable=False)
+    level_id = Column(Integer, ForeignKey("levels.id"), nullable=False)
     total_marks = Column(Integer, default=0, nullable=False)
     passing_marks = Column(Integer, default=0, nullable=False)
+    __table_args__ = (Index("ix_assessments_type_language", "assessment_type", "language_id"),)
     language = relationship("Language")
     level = relationship("Level")
     questions = relationship("Question", back_populates="assessment", cascade="all, delete-orphan")
@@ -122,11 +127,12 @@ class Assessment(Base):
 class Question(Base):
     __tablename__ = "questions"
     id = Column(Integer, primary_key=True)
-    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=False, index=True)
+    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=False)
     question_text = Column(Text, nullable=False)
     question_type = Column(String(30), nullable=False)
     marks = Column(Integer, default=1, nullable=False)
     correct_answer = Column(Text, default="", nullable=False)
+    __table_args__ = (Index("ix_questions_assessment", "assessment_id"),)
     assessment = relationship("Assessment", back_populates="questions")
     options = relationship("QuestionOption", back_populates="question", cascade="all, delete-orphan")
 
@@ -134,9 +140,10 @@ class Question(Base):
 class QuestionOption(Base):
     __tablename__ = "question_options"
     id = Column(Integer, primary_key=True)
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     option_text = Column(Text, nullable=False)
     is_correct = Column(Boolean, default=False, nullable=False)
+    __table_args__ = (Index("ix_question_options_question", "question_id"),)
     question = relationship("Question", back_populates="options")
 
 
@@ -144,7 +151,7 @@ class AssessmentAttempt(Base):
     __tablename__ = "assessment_attempts"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=False, index=True)
+    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=False)
     score = Column(Integer, default=0, nullable=False)
     percentage = Column(Integer, default=0, nullable=False)
     started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -157,8 +164,8 @@ class AssessmentAttempt(Base):
 class AssessmentAnswer(Base):
     __tablename__ = "assessment_answers"
     id = Column(Integer, primary_key=True)
-    attempt_id = Column(Integer, ForeignKey("assessment_attempts.id"), nullable=False, index=True)
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    attempt_id = Column(Integer, ForeignKey("assessment_attempts.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     answer_text = Column(Text, default="", nullable=False)
     marks_obtained = Column(Integer, default=0, nullable=False)
     attempt = relationship("AssessmentAttempt", back_populates="answers")
@@ -172,7 +179,52 @@ class LearnerProgress(Base):
     skill = Column(String(30), nullable=False)
     score = Column(Integer, default=0, nullable=False)
     proficiency_level = Column(String(40), nullable=False)
-    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=True, index=True)
+    assessment_id = Column(Integer, ForeignKey("assessments.id"), nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (Index("ix_learner_progress_user_skill_updated", "user_id", "skill", "updated_at"),)
     user = relationship("User", back_populates="progress")
     assessment = relationship("Assessment")
+
+
+class LearnerStats(Base):
+    __tablename__ = "learner_stats"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    xp = Column(Integer, default=0, nullable=False)
+    gems = Column(Integer, default=0, nullable=False)
+    hearts = Column(Integer, default=5, nullable=False)
+    streak_days = Column(Integer, default=0, nullable=False)
+    last_activity_date = Column(Date, nullable=True)
+    daily_date = Column(Date, nullable=True)
+    daily_xp = Column(Integer, default=0, nullable=False)
+    daily_lessons = Column(Integer, default=0, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user = relationship("User", back_populates="stats")
+
+
+class LessonCompletion(Base):
+    __tablename__ = "lesson_completions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    language_code = Column(String(12), nullable=False)
+    unit_number = Column(Integer, nullable=False)
+    lesson_step = Column(Integer, nullable=False)
+    score = Column(Integer, default=0, nullable=False)
+    xp_earned = Column(Integer, default=0, nullable=False)
+    completed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    user = relationship("User", back_populates="lesson_completions")
+    __table_args__ = (
+        UniqueConstraint("user_id", "language_code", "unit_number", "lesson_step", name="uq_lesson_completion"),
+        Index("ix_lesson_completions_user_date", "user_id", "completed_at"),
+    )
+
+
+class GameActivity(Base):
+    __tablename__ = "game_activity"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    game_id = Column(String(50), nullable=False)
+    score = Column(Integer, default=0, nullable=False)
+    duration_seconds = Column(Integer, default=0, nullable=False)
+    played_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    user = relationship("User", back_populates="game_activity")
